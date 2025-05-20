@@ -2,12 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
-import os # Mặc dù không dùng trực tiếp trong logic Streamlit, giữ lại nếu có hàm phụ thuộc
 
 # Thiết lập trang rộng hơn
 st.set_page_config(layout="wide")
-
-# Hàm hỗ trợ (nếu có, ví dụ: contains_any, nhưng không thấy dùng trong script mới)
 
 @st.cache_data # Cache để tăng tốc độ khi tải lại mà file không đổi
 def load_excel(uploaded_file_obj):
@@ -20,7 +17,6 @@ def load_excel(uploaded_file_obj):
                 return pd.read_excel(uploaded_file_obj, engine='openpyxl')
             elif file_name.endswith('.xls'):
                 # Đối với file .xls, xlrd có thể cần thiết nếu pandas không tự xử lý được
-                # Tuy nhiên, pandas phiên bản mới hơn thường xử lý tốt .xls
                 try:
                     # Cố gắng đọc .xls mà không chỉ định engine trước, pandas sẽ tự chọn
                     return pd.read_excel(uploaded_file_obj)
@@ -75,8 +71,8 @@ def process_crm_data(
     st.info(f"Bắt đầu xử lý dữ liệu cho chi nhánh: '{chi_nhanh_filter}' và địa bàn kiểm toán: '{dia_ban_kt_filter}'")
 
     # ✅ Lọc dữ liệu theo BRCD chứa chuỗi nhập vào
-    df_crm4_filtered = df_crm4[df_crm4['BRANCH_VAY'].astype(str).str.upper().str.contains(chi_nhanh_filter)].copy() # Added .copy()
-    df_crm32_filtered = df_crm32[df_crm32['BRCD'].astype(str).str.upper().str.contains(chi_nhanh_filter)].copy() # Added .copy()
+    df_crm4_filtered = df_crm4[df_crm4['BRANCH_VAY'].astype(str).str.upper().str.contains(chi_nhanh_filter)].copy()
+    df_crm32_filtered = df_crm32[df_crm32['BRCD'].astype(str).str.upper().str.contains(chi_nhanh_filter)].copy()
 
 
     st.write(f"📌 Số dòng CRM4 sau khi lọc theo chi nhánh '{chi_nhanh_filter}': {len(df_crm4_filtered)}")
@@ -87,7 +83,7 @@ def process_crm_data(
         return None
     df_code_tsbd = df_code_tsbd_data[['CODE CAP 2', 'CODE']].copy()
     df_code_tsbd.columns = ['CAP_2', 'LOAI_TS']
-    df_tsbd_code = df_code_tsbd[['CAP_2', 'LOAI_TS']].drop_duplicates().copy() # Added .copy()
+    df_tsbd_code = df_code_tsbd[['CAP_2', 'LOAI_TS']].drop_duplicates().copy()
     df_crm4_filtered = df_crm4_filtered.merge(df_tsbd_code, how='left', on='CAP_2')
     df_crm4_filtered['LOAI_TS'] = df_crm4_filtered.apply(
         lambda row: 'Không TS' if pd.isna(row['CAP_2']) or str(row['CAP_2']).strip() == '' else row['LOAI_TS'],
@@ -98,7 +94,7 @@ def process_crm_data(
         axis=1
     )
     df_vay_4 = df_crm4_filtered.copy()
-    df_vay = df_vay_4[~df_vay_4['LOAI'].isin(['Bao lanh', 'LC'])].copy() # Added .copy()
+    df_vay = df_vay_4[~df_vay_4['LOAI'].isin(['Bao lanh', 'LC'])].copy()
 
     if not df_vay.empty:
         pivot_ts = df_vay.pivot_table(
@@ -118,7 +114,7 @@ def process_crm_data(
         st.warning("Không có dữ liệu 'Cho vay' sau khi lọc, bảng pivot có thể rỗng hoặc lỗi.")
         pivot_merge = pd.DataFrame(columns=['CIF_KH_VAY', 'GIÁ TRỊ TS', 'DƯ NỢ'])
 
-    df_info = df_crm4_filtered[['CIF_KH_VAY', 'TEN_KH_VAY', 'CUSTTPCD', 'NHOM_NO']].drop_duplicates(subset='CIF_KH_VAY').copy() # Added .copy()
+    df_info = df_crm4_filtered[['CIF_KH_VAY', 'TEN_KH_VAY', 'CUSTTPCD', 'NHOM_NO']].drop_duplicates(subset='CIF_KH_VAY').copy()
     pivot_final = df_info.merge(pivot_merge, on='CIF_KH_VAY', how='left')
     pivot_final = pivot_final.reset_index().rename(columns={'index': 'STT'})
     pivot_final['STT'] += 1
@@ -143,7 +139,7 @@ def process_crm_data(
         return None
     df_muc_dich_vay_src = df_muc_dich_data[['CODE_MDSDV4', 'GROUP']].copy()
     df_muc_dich_vay_src.columns = ['MUC_DICH_VAY_CAP_4', 'MUC DICH']
-    df_muc_dich_map = df_muc_dich_vay_src[['MUC_DICH_VAY_CAP_4', 'MUC DICH']].drop_duplicates().copy() # Added .copy()
+    df_muc_dich_map = df_muc_dich_vay_src[['MUC_DICH_VAY_CAP_4', 'MUC DICH']].drop_duplicates().copy()
     df_crm32_filtered = df_crm32_filtered.merge(df_muc_dich_map, how='left', on='MUC_DICH_VAY_CAP_4')
     df_crm32_filtered['MUC DICH'] = df_crm32_filtered['MUC DICH'].fillna('(blank)')
     df_crm32_filtered['GHI_CHU_MUC_DICH'] = df_crm32_filtered.apply(
@@ -251,30 +247,38 @@ def process_crm_data(
         lambda x: 'x' if x in cif_quahan else ''
     )
 
-    df_bds_matched = pd.DataFrame()
+    # --- Bắt đầu phần xử lý TSBĐ khác địa bàn (đã điều chỉnh) ---
+    df_bds_matched = pd.DataFrame() # Khởi tạo rỗng để tránh lỗi nếu điều kiện không thỏa
     if df_sol_data is not None and dia_ban_kt_filter:
         df_sol = df_sol_data.copy()
         df_crm4_filtered['SECU_SRL_NUM'] = df_crm4_filtered['SECU_SRL_NUM'].astype(str).str.strip()
         df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
         df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
+
         ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
-        df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)].copy() # Added .copy()
-        df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
-        # Corrected: Use df_crm4_filtered here, not df_crm4
+        df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)].copy()
+
+        df_bds = df_17_filtered[df_17_filtered['C02'].str.strip() == 'Bat dong san'].copy()
+        
+        # Sửa lỗi: Đảm bảo df_bds_matched được lọc đúng với SECU_SRL_NUM của df_crm4_filtered
         df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
+
         def extract_tinh_thanh(diachi):
             if pd.isna(diachi): return ''
-            # Ensure diachi is string before splitting
-            parts = str(diachi).split(',')
+            parts = str(diachi).split(',') # Chuyển sang string trước khi split
             return parts[-1].strip().lower() if parts else ''
+
         df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
         df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
-            lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
+            lambda x: 'x' if x and x != dia_ban_kt_filter else '' # Sử dụng dia_ban_kt_filter trực tiếp
         )
+
         ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
-         # Corrected: Use df_crm4_filtered here, not df_crm4
+        
+        # Sửa lỗi: Lấy CIF từ df_crm4_filtered để đảm bảo đã lọc theo chi nhánh
         cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
         cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique()
+
         pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
             lambda x: 'x' if x in cif_canh_bao else ''
         )
@@ -282,7 +286,7 @@ def process_crm_data(
         pivot_full['KH có TSBĐ khác địa bàn'] = ''
         if df_sol_data is None: st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
         if not dia_ban_kt_filter: st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
-
+    # --- Kết thúc phần xử lý TSBĐ khác địa bàn ---
 
     df_gop = pd.DataFrame()
     df_count = pd.DataFrame()
@@ -301,13 +305,12 @@ def process_crm_data(
         df_gn['NGAY'] = df_gn['NGAY_GIAI_NGAN']
         df_gn['CIF'] = df_gn['CIF'].astype(str).str.strip()
         df_gop = pd.concat([df_tt, df_gn], ignore_index=True)
-        df_gop = df_gop[df_gop['NGAY'].notna()].copy() # Added .copy()
-        df_gop = df_gop.sort_values(by=['CIF', 'NGAY', 'GIAI_NGAN_TT']).copy() # Added .copy()
+        df_gop = df_gop[df_gop['NGAY'].notna()].copy()
+        df_gop = df_gop.sort_values(by=['CIF', 'NGAY', 'GIAI_NGAN_TT']).copy()
         df_count = df_gop.groupby(['CIF', 'NGAY', 'GIAI_NGAN_TT']).size().unstack(fill_value=0).reset_index()
         if 'Giải ngân' not in df_count.columns: df_count['Giải ngân'] = 0
         if 'Tất toán' not in df_count.columns: df_count['Tất toán'] = 0
         df_count['CO_CA_GN_VA_TT'] = ((df_count['Giải ngân'] > 0) & (df_count['Tất toán'] > 0)).astype(int)
-        # Corrected the column name here from 'CO_CA_CA_GN_VA_TT' to 'CO_CA_GN_VA_TT'
         ds_ca_gn_tt_series = df_count[df_count['CO_CA_GN_VA_TT'] == 1]['CIF']
         ds_ca_gn_tt = ds_ca_gn_tt_series.astype(str).str.strip().unique()
         pivot_full['KH có cả GNG và TT trong 1 ngày'] = pivot_full['CIF_KH_VAY'].apply(
@@ -330,12 +333,12 @@ def process_crm_data(
             df_delay['NGAY_THANH_TOAN_FILL'] = df_delay['NGAY_THANH_TOAN'].fillna(ngay_danh_gia_cham_tra)
             df_delay['SO_NGAY_CHAM_TRA'] = (df_delay['NGAY_THANH_TOAN_FILL'] - df_delay['NGAY_DEN_HAN_TT']).dt.days
             mask_period = df_delay['NGAY_DEN_HAN_TT'].dt.year.between(2023, 2025)
-            df_delay = df_delay[mask_period & df_delay['NGAY_DEN_HAN_TT'].notna()].copy() # Added .copy()
-            pivot_full_temp_for_delay = pivot_full[['CIF_KH_VAY', 'DƯ NỢ', 'NHOM_NO']].rename(columns={'CIF_KH_VAY': 'CIF_ID'}).copy() # Added .copy()
+            df_delay = df_delay[mask_period & df_delay['NGAY_DEN_HAN_TT'].notna()].copy()
+            pivot_full_temp_for_delay = pivot_full[['CIF_KH_VAY', 'DƯ NỢ', 'NHOM_NO']].rename(columns={'CIF_KH_VAY': 'CIF_ID'}).copy()
             pivot_full_temp_for_delay['CIF_ID'] = pivot_full_temp_for_delay['CIF_ID'].astype(str).str.strip()
             df_delay = df_delay.merge(pivot_full_temp_for_delay, on='CIF_ID', how='left')
             df_delay['NHOM_NO'] = pd.to_numeric(df_delay['NHOM_NO'], errors='coerce')
-            df_delay = df_delay[df_delay['NHOM_NO'] == 1.0].copy() # Added .copy()
+            df_delay = df_delay[df_delay['NHOM_NO'] == 1.0].copy()
             def cap_cham_tra(days):
                 if pd.isna(days): return None
                 if days >= 10: return '>=10'
@@ -347,13 +350,12 @@ def process_crm_data(
             df_delay.sort_values(['CIF_ID', 'NGAY_DEN_HAN_TT_DATE', 'CAP_CHAM_TRA'],
                                  key=lambda s: s.map({'>=10':0, '4-9':1, '<4':2, None: 3}) if s.name == 'CAP_CHAM_TRA' else s,
                                  inplace=True, na_position='last')
-            df_unique_delay = df_delay.drop_duplicates(subset=['CIF_ID', 'NGAY_DEN_HAN_TT_DATE'], keep='first').copy() # Added .copy()
+            df_unique_delay = df_delay.drop_duplicates(subset=['CIF_ID', 'NGAY_DEN_HAN_TT_DATE'], keep='first').copy()
             df_dem_delay = df_unique_delay.groupby(['CIF_ID', 'CAP_CHAM_TRA']).size().unstack(fill_value=0)
             df_dem_delay['KH Phát sinh chậm trả > 10 ngày'] = np.where(df_dem_delay.get('>=10', 0) > 0, 'x', '')
             df_dem_delay['KH Phát sinh chậm trả 4-9 ngày'] = np.where(
                 (df_dem_delay.get('>=10', 0) == 0) & (df_dem_delay.get('4-9', 0) > 0), 'x', ''
             )
-            # Ensure index is string for merging
             df_dem_delay.index = df_dem_delay.index.astype(str)
             pivot_full['CIF_KH_VAY'] = pivot_full['CIF_KH_VAY'].astype(str).str.strip()
 
