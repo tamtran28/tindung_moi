@@ -260,9 +260,11 @@ def process_crm_data(
         ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
         df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)].copy() # Added .copy()
         df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
+        # Corrected: Use df_crm4_filtered here, not df_crm4
         df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
         def extract_tinh_thanh(diachi):
             if pd.isna(diachi): return ''
+            # Ensure diachi is string before splitting
             parts = str(diachi).split(',')
             return parts[-1].strip().lower() if parts else ''
         df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
@@ -270,6 +272,7 @@ def process_crm_data(
             lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
         )
         ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
+         # Corrected: Use df_crm4_filtered here, not df_crm4
         cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
         cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique()
         pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
@@ -370,6 +373,19 @@ def process_crm_data(
         pivot_full['KH Phát sinh chậm trả 4-9 ngày'] = ''
         st.warning("Không có dữ liệu Mục 57 (chậm trả) để xử lý.")
 
+    # --- Debugging: Check df_bds_matched before returning ---
+    st.subheader("Debug: Thông tin DataFrame TSBĐ khác địa bàn (df_bds_matched_res)")
+    if df_bds_matched is not None:
+        st.write(f"Shape của df_bds_matched: {df_bds_matched.shape}")
+        if not df_bds_matched.empty:
+            st.dataframe(df_bds_matched.head())
+        else:
+            st.info("df_bds_matched rỗng sau khi xử lý.")
+    else:
+        st.warning("df_bds_matched là None.")
+    # --- End Debugging ---
+
+
     return (pivot_full, df_crm4_filtered, pivot_final, pivot_merge,
             df_crm32_filtered, pivot_mucdich, df_delay_processed, df_gop, df_count, df_bds_matched,
             df_crm4_for_tsbd)
@@ -455,9 +471,14 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu", key="process_button"):
                             if df_delay_res is not None and not df_delay_res.empty : df_delay_res.to_excel(writer, sheet_name='tieu chi 4 (cham tra)', index=False)
                             if df_gop_res is not None and not df_gop_res.empty: df_gop_res.to_excel(writer, sheet_name='tieu chi 3 (gop GN TT)', index=False)
                             if df_count_res is not None and not df_count_res.empty: df_count_res.to_excel(writer, sheet_name='tieu chi 3 (dem GN TT)', index=False)
-                            if df_bds_matched_res is not None and not df_bds_matched_res.empty: df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
-                            # Add the new sheet for df_bds_matched_res
-                            if df_bds_matched_res is not None and not df_bds_matched_res.empty: df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2_dot3', index=False)
+
+                            # Check if df_bds_matched_res is not None and not empty before writing these sheets
+                            if df_bds_matched_res is not None and not df_bds_matched_res.empty:
+                                df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
+                                df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2_dot3', index=False)
+                            else:
+                                st.warning("Không có dữ liệu TSBĐ khác địa bàn để xuất ra sheet 'tieu chi 2 (BDS khac DB)' và 'tieu chi 2_dot3'.")
+
                             if df_crm4_for_tsbd_res is not None and not df_crm4_for_tsbd_res.empty: df_crm4_for_tsbd_res.to_excel(writer, sheet_name='tieu chi 1)', index=False)
 
 
