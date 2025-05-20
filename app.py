@@ -481,7 +481,7 @@ def process_crm_data(
 
     # Trả về tất cả các DataFrame cần thiết cho việc xuất file
     return (pivot_full, df_crm4_filtered, pivot_final, pivot_merge,
-            df_crm32_filtered, pivot_mucdich, df_delay_processed, df_gop, df_count, df_bds_matched,
+            df_crm32_filtered, pivot_mucdich, df_delay_processed, df_gop, df_count,  ma_ts_canh_bao,
             df_crm4_for_tsbd)
 
 
@@ -553,7 +553,7 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu và Tạo báo cáo", key="
                         # Giải nén (unpack) các DataFrame kết quả
                         (pivot_full_res, df_crm4_filtered_res, pivot_final_res, pivot_merge_res,
                          df_crm32_filtered_res, pivot_mucdich_res, df_delay_res, df_gop_res,
-                         df_count_res, df_bds_matched_res, df_crm4_for_tsbd_res) = results
+                         df_count_res, df_bds_matched_res, df_crm4_for_tsbd_res,ma_ts_canh_bao_res) = results
 
                         st.success("🎉 Xử lý dữ liệu hoàn tất! Bạn có thể xem trước kết quả và tải file.")
 
@@ -578,9 +578,9 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu và Tạo báo cáo", key="
                             if not df_count_res.empty: df_count_res.to_excel(writer, sheet_name='tieu chi 3 (dem GN TT)', index=False)
 
                             # df_bds_matched_res: TSBĐ khác địa bàn
-                            if not df_bds_matched_res.empty:
-                                df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
-                                df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2_dot3', index=False)
+                            if not ma_ts_canh_bao_res.empty:
+                                ma_ts_canh_bao_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
+                                ma_ts_canh_bao_res.to_excel(writer, sheet_name='tieu chi 2_dot3', index=False)
                             else:
                                 st.info("⚠️ Không có dữ liệu TSBĐ khác địa bàn để xuất ra sheet 'tieu chi 2 (BDS khac DB)' và 'tieu chi 2_dot3'.")
 
