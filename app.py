@@ -304,7 +304,8 @@ def process_crm_data(
         if 'Giải ngân' not in df_count.columns: df_count['Giải ngân'] = 0
         if 'Tất toán' not in df_count.columns: df_count['Tất toán'] = 0
         df_count['CO_CA_GN_VA_TT'] = ((df_count['Giải ngân'] > 0) & (df_count['Tất toán'] > 0)).astype(int)
-        ds_ca_gn_tt_series = df_count[df_count['CO_CA_CA_GN_VA_TT'] == 1]['CIF'] # Corrected column name here
+        # Corrected the column name here from 'CO_CA_CA_GN_VA_TT' to 'CO_CA_GN_VA_TT'
+        ds_ca_gn_tt_series = df_count[df_count['CO_CA_GN_VA_TT'] == 1]['CIF']
         ds_ca_gn_tt = ds_ca_gn_tt_series.astype(str).str.strip().unique()
         pivot_full['KH có cả GNG và TT trong 1 ngày'] = pivot_full['CIF_KH_VAY'].apply(
             lambda x: 'x' if x in ds_ca_gn_tt else ''
