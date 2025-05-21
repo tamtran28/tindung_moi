@@ -253,7 +253,39 @@ def process_crm_data(
     )
 
    
-    # Khởi tạo cif_canh_bao_series và cif_canh_bao ở đây để đảm bảo chúng luôn được định nghĩa
+    # # Khởi tạo cif_canh_bao_series và cif_canh_bao ở đây để đảm bảo chúng luôn được định nghĩa
+    # cif_canh_bao_series = pd.Series(dtype=str)
+    # cif_canh_bao = np.array([], dtype=str)
+
+    # if df_sol_data is not None and dia_ban_kt_filter:
+    #     df_sol = df_sol_data.copy()
+    #     df_crm4_filtered['SECU_SRL_NUM'] = df_crm4_filtered['SECU_SRL_NUM'].astype(str).str.strip()
+    #     df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
+    #     df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
+    #     df_sol['C19'] = df_sol['C19'].astype(str) # Đảm bảo cột C19 là string
+        
+    #     ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
+    #     df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
+    #     df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
+    #     df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
+    #     def extract_tinh_thanh(diachi):
+    #         if pd.isna(diachi): return ''
+    #         parts = str(diachi).split(',')
+    #         return parts[-1].strip().lower() if parts else ''
+    #     df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
+    #     df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
+    #         lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
+    #     )
+    #     ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
+    #     cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
+    #     cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique() # Cập nhật cif_canh_bao
+    #     pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
+    #         lambda x: 'x' if x in cif_canh_bao else ''
+    #     )
+    # else:
+    #     pivot_full['KH có TSBĐ khác địa bàn'] = ''
+    #     if df_sol_data is None: st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
+    #     if not dia_ban_kt_filter: st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
     cif_canh_bao_series = pd.Series(dtype=str)
     cif_canh_bao = np.array([], dtype=str)
 
@@ -263,7 +295,7 @@ def process_crm_data(
         df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
         df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
         df_sol['C19'] = df_sol['C19'].astype(str) # Đảm bảo cột C19 là string
-        
+
         ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
         df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
         df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
