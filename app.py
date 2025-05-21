@@ -482,7 +482,7 @@ def process_crm_data(
     # Trả về tất cả các DataFrame cần thiết cho việc xuất file
     return (pivot_full, df_crm4_filtered, pivot_final, pivot_merge,
             df_crm32_filtered, pivot_mucdich, df_delay_processed, df_gop, df_count, df_bds_matched,
-            df_crm4_for_tsbd)
+            df_crm4_for_tsbd,cif_canh_bao_series,cif_canh_bao)
 
 
 # --- Giao diện người dùng Streamlit ---
@@ -576,7 +576,8 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu và Tạo báo cáo", key="
                             if not df_delay_res.empty: df_delay_res.to_excel(writer, sheet_name='tieu chi 4 (cham tra)', index=False)
                             if not df_gop_res.empty: df_gop_res.to_excel(writer, sheet_name='tieu chi 3 (gop GN TT)', index=False)
                             if not df_count_res.empty: df_count_res.to_excel(writer, sheet_name='tieu chi 3 (dem GN TT)', index=False)
-
+                            if not cif_canh_bao_series.empty: cif_canh_bao_series.to_excel(writer, sheet_name='tieu chi 2_ (dem GN TT)', index=False)
+                            if not cif_canh_bao.empty: cif_canh_bao.to_excel(writer, sheet_name='tieu chi 2_ (dem GN TT)', index=False)    
                             # df_bds_matched_res: TSBĐ khác địa bàn
                             if not df_bds_matched_res.empty:
                                 df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
