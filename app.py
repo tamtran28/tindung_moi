@@ -252,7 +252,7 @@ def process_crm_data(
         lambda x: 'x' if x in cif_quahan else ''
     )
 
-    df_bds_matched = pd.DataFrame()
+   
     # Khởi tạo cif_canh_bao_series và cif_canh_bao ở đây để đảm bảo chúng luôn được định nghĩa
     cif_canh_bao_series = pd.Series(dtype=str)
     cif_canh_bao = np.array([], dtype=str)
