@@ -286,157 +286,46 @@ def process_crm_data(
     #     pivot_full['KH có TSBĐ khác địa bàn'] = ''
     #     if df_sol_data is None: st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
     #     if not dia_ban_kt_filter: st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
-   import pandas as pd
-import numpy as np
-import streamlit as st
-from io import BytesIO
+    df_crm4_filtered = df_crm4.dropna(subset=['SECU_SRL_NUM'])
+    ds_secu = df_crm4_filtered['SECU_SRL_NUM'].unique()
 
-# Giả sử df_crm4_filtered và df_sol_data đã được load và xử lý trước đó
-# Ví dụ:
-# st.session_state['df_crm4_filtered'] = pd.read_csv("crm4_filtered.csv")
-# st.session_state['df_sol'] = pd.read_csv("sol.csv")
+    df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
 
-st.title("Kiểm tra Tài sản Bất động sản Khác Địa bàn")
+    # Nhập địa bàn kiểm toán
+    dia_ban_kt = st.text_input("Nhập tên tỉnh/thành của đơn vị đang kiểm toán (ví dụ: Bạc Liêu)").strip().lower()
 
-# Khởi tạo df_crm4_filtered và df_sol_data từ session_state
-df_crm4_filtered = st.session_state.get('df_crm4_filtered')
-df_sol_data = st.session_state.get('df_sol')
+    if dia_ban_kt:
+        # Bước 1: Lọc BĐS
+        df_bds = df_17_filtered[df_17_filtered['C02'].str.strip() == 'Bat dong san'].copy()
 
-# Khởi tạo pivot_full (ví dụ, nếu nó được tạo ở một phần khác của ứng dụng)
-# Nếu pivot_full chưa tồn tại, hãy tạo một DataFrame trống để tránh lỗi
-if 'pivot_full' not in st.session_state:
-    st.session_state['pivot_full'] = pd.DataFrame(columns=['CIF_KH_VAY']) # Hoặc các cột khác của pivot_full
-pivot_full = st.session_state['pivot_full']
+        # Bước 2: Đối chiếu mã tài sản
+        df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4['SECU_SRL_NUM'])].copy()
 
+        # Bước 3: Tách tỉnh/thành từ địa chỉ
+        def extract_tinh_thanh(diachi):
+            if pd.isna(diachi): return ''
+            parts = diachi.split(',')
+            return parts[-1].strip().lower() if parts else ''
 
-# Input cho địa bàn kiểm toán
-dia_ban_kt_filter = st.text_input("Nhập tên tỉnh/thành của đơn vị đang kiểm toán (ví dụ: Bạc Liêu): ").strip()
+        df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
 
-# Khởi tạo cif_canh_bao_series và cif_canh_bao ở đây để đảm bảo chúng luôn được định nghĩa
-cif_canh_bao_series = pd.Series(dtype=str)
-cif_canh_bao = np.array([], dtype=str)
-
-# Khởi tạo df_bds_matched_display để hiển thị, có thể là rỗng ban đầu
-df_bds_matched_display = pd.DataFrame()
-
-
-if df_sol_data is not None and dia_ban_kt_filter:
-    df_sol = df_sol_data.copy()
-    
-    # Đảm bảo các cột liên quan là string và loại bỏ khoảng trắng
-    if 'SECU_SRL_NUM' in df_crm4_filtered.columns:
-        df_crm4_filtered['SECU_SRL_NUM'] = df_crm4_filtered['SECU_SRL_NUM'].astype(str).str.strip()
-    else:
-        st.error("Cột 'SECU_SRL_NUM' không tồn tại trong df_crm4_filtered.")
-        st.stop() # Dừng thực thi nếu cột quan trọng không có
-
-    if 'C01' in df_sol.columns:
-        df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
-    else:
-        st.error("Cột 'C01' không tồn tại trong df_sol.")
-        st.stop()
-
-    if 'C02' in df_sol.columns:
-        df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
-    else:
-        st.error("Cột 'C02' không tồn tại trong df_sol.")
-        st.stop()
-
-    if 'C19' in df_sol.columns:
-        df_sol['C19'] = df_sol['C19'].astype(str) # Đảm bảo cột C19 là string
-    else:
-        st.error("Cột 'C19' không tồn tại trong df_sol.")
-        st.stop()
-
-    ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
-    
-    # Lọc df_17 sao cho mã trong cột C01 nằm trong danh sách đã lấy
-    df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)].copy()
-
-    # Bước 1: Lọc "Bất động sản" từ df_sol (Mục 17)
-    df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
-
-    # Bước 2: Đối chiếu mã tài sản giữa C01 (df_sol) và SECU_SRL_NUM (CRM4)
-    # Chỉ giữ tài sản thuộc Sol đó (có trong df_crm4)
-    df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
-    
-    # Bước 3: Tách tỉnh/thành phố từ cột C19 (lấy phần sau dấu phẩy cuối)
-    def extract_tinh_thanh(diachi):
-        if pd.isna(diachi): return ''
-        parts = str(diachi).split(',')
-        return parts[-1].strip().lower() if parts else ''
-    
-    df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
-    
-    # Bước 4: So sánh với địa bàn kiểm toán
-    df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
-        lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
-    )
-
-    # Gán df_bds_matched cho biến hiển thị
-    df_bds_matched_display = df_bds_matched.copy()
-
-    # Bước 5: Lấy danh sách CIF có tài sản khác địa bàn (dựa vào mã tài sản map sang CRM4)
-    # ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique() # Phiên bản cũ
-    ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'] # Phiên bản hiện tại
-
-    if not ma_ts_canh_bao.empty: # Kiểm tra nếu có mã tài sản cảnh báo
-        cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
-        cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique() # Cập nhật cif_canh_bao
-    else:
-        cif_canh_bao = np.array([], dtype=str) # Đảm bảo cif_canh_bao là mảng rỗng nếu không có mã tài sản cảnh báo
-
-    # Đảm bảo cột 'CIF_KH_VAY' tồn tại trong pivot_full trước khi áp dụng
-    if 'CIF_KH_VAY' in pivot_full.columns:
-        pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
-            lambda x: 'x' if x in cif_canh_bao else ''
+        # Bước 4: So sánh với địa bàn kiểm toán
+        df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
+            lambda x: 'x' if x and x != dia_ban_kt else ''
         )
-    else:
-        st.warning("Cột 'CIF_KH_VAY' không tồn tại trong pivot_full. Không thể thêm cột 'KH có TSBĐ khác địa bàn'.")
-        # Hoặc bạn có thể tạo cột này với giá trị mặc định nếu cần
-        pivot_full['KH có TSBĐ khác địa bàn'] = ''
+        # Bước 5 mới: Gắn cờ trực tiếp từ df_bds_matched
+        df_canh_bao_cif = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']
 
-else:
-    pivot_full['KH có TSBĐ khác địa bàn'] = ''
-    if df_sol_data is None: st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
-    if not dia_ban_kt_filter: st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
+        if not df_canh_bao_cif.empty:
+       # Lấy các CIF từ CRM4 map theo mã tài sản cảnh báo
+       cif_canh_bao = df_crm4[df_crm4['SECU_SRL_NUM'].isin(df_canh_bao_cif['C01'])]['CIF_KH_VAY'].dropna().unique()
+       else:
+       cif_canh_bao = []  # không có cảnh báo nào
 
-
-# --- HIỂN THỊ BẢNG ĐÃ LỌC TỪ MỤC 17 CÓ ĐÁNH DẤU ---
-st.subheader("Bảng Tài sản Bất động sản (Mục 17) đã lọc và đánh dấu:")
-
-if not df_bds_matched_display.empty:
-    st.dataframe(df_bds_matched_display)
-
-    # Nút tải xuống
-    @st.cache_data
-    def convert_df_to_excel(df):
-        output = BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
-        writer.close()
-        processed_data = output.getvalue()
-        return processed_data
-
-    excel_data = convert_df_to_excel(df_bds_matched_display)
-    st.download_button(
-        label="Tải xuống bảng TSBĐ đã lọc (.xlsx)",
-        data=excel_data,
-        file_name="bang_tsbd_da_loc.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-else:
-    st.info("Không có dữ liệu tài sản bất động sản nào khớp hoặc đã được đánh dấu để hiển thị.")
-
-# --- HIỂN THỊ CÁC KẾT QUẢ KHÁC (nếu có) ---
-st.subheader("Kết quả tổng hợp (pivot_full):")
-st.dataframe(pivot_full)
-
-if not cif_canh_bao.size == 0:
-    st.subheader("Danh sách CIF có tài sản bất động sản khác địa bàn:")
-    st.write(cif_canh_bao)
-else:
-    st.info(f"Không có CIF nào có tài sản bất động sản khác địa bàn '{dia_ban_kt_filter}'.")
+       # Bước 6: Gắn cờ vào pivot_full — luôn tạo cột dù không có CIF cảnh báo
+       pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
+       lambda x: 'x' if x in cif_canh_bao else ''
+       )
     
     df_gop = pd.DataFrame()
     df_count = pd.DataFrame()
