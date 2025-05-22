@@ -2,27 +2,21 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
-import os # Mặc dù không dùng trực tiếp trong logic Streamlit, giữ lại nếu có hàm phụ thuộc
+import os
 
 # Thiết lập trang rộng hơn
 st.set_page_config(layout="wide")
 
-# Hàm hỗ trợ (nếu có, ví dụ: contains_any, nhưng không thấy dùng trong script mới)
-
-@st.cache_data # Cache để tăng tốc độ khi tải lại mà file không đổi
+@st.cache_data
 def load_excel(uploaded_file_obj):
     """Hàm tải và đọc file Excel."""
     if uploaded_file_obj is not None:
         try:
-            # Thử đọc với engine mặc định, nếu lỗi thì thử 'openpyxl' cho .xlsx và 'xlrd' cho .xls
             file_name = uploaded_file_obj.name
             if file_name.endswith('.xlsx'):
                 return pd.read_excel(uploaded_file_obj, engine='openpyxl')
             elif file_name.endswith('.xls'):
-                # Đối với file .xls, xlrd có thể cần thiết nếu pandas không tự xử lý được
-                # Tuy nhiên, pandas phiên bản mới hơn thường xử lý tốt .xls
                 try:
-                    # Cố gắng đọc .xls mà không chỉ định engine trước, pandas sẽ tự chọn
                     return pd.read_excel(uploaded_file_obj)
                 except Exception as e_xls:
                     st.warning(f"Lỗi khi đọc file .xls {file_name} với engine mặc định: {e_xls}. Thử với xlrd...")
@@ -31,7 +25,7 @@ def load_excel(uploaded_file_obj):
                     except Exception as e_xlrd:
                         st.error(f"Không thể đọc file .xls {file_name} với xlrd: {e_xlrd}")
                         return None
-            else: # Cho các trường hợp khác, hoặc nếu file không có đuôi cụ thể
+            else:
                 return pd.read_excel(uploaded_file_obj)
         except Exception as e:
             st.error(f"Lỗi khi đọc file {uploaded_file_obj.name}: {e}")
@@ -63,18 +57,16 @@ def process_crm_data(
     """
     Hàm chính để xử lý tất cả dữ liệu CRM.
     """
-    # Tạo bản sao để tránh thay đổi dữ liệu gốc
     df_crm4 = df_crm4_raw.copy() if df_crm4_raw is not None else None
     df_crm32 = df_crm32_raw.copy() if df_crm32_raw is not None else None
 
     if df_crm4 is None or df_crm32 is None:
         st.error("Dữ liệu CRM4 hoặc CRM32 chưa được tải lên hoặc bị lỗi.")
-        # Trả về None cho tất cả các kết quả để tránh lỗi unpack
         return None, None, None, None, None, None, None, None, None, None, None, None, None
 
     st.info(f"Bắt đầu xử lý dữ liệu cho chi nhánh: '{chi_nhanh_filter}' và địa bàn kiểm toán: '{dia_ban_kt_filter}'")
 
-    # ✅ Lọc dữ liệu theo BRCD chứa chuỗi nhập vào
+    # Lọc dữ liệu theo BRCD chứa chuỗi nhập vào
     df_crm4_filtered = df_crm4[df_crm4['BRANCH_VAY'].astype(str).str.upper().str.contains(chi_nhanh_filter)]
     df_crm32_filtered = df_crm32[df_crm32['BRCD'].astype(str).str.upper().str.contains(chi_nhanh_filter)]
 
@@ -83,7 +75,6 @@ def process_crm_data(
 
     if df_code_tsbd_data is None:
         st.error("File CODE_LOAI TSBD chưa được tải hoặc lỗi.")
-        # Trả về None cho tất cả các kết quả để tránh lỗi unpack
         return None, None, None, None, None, None, None, None, None, None, None, None, None
     df_code_tsbd = df_code_tsbd_data[['CODE CAP 2', 'CODE']].copy()
     df_code_tsbd.columns = ['CAP_2', 'LOAI_TS']
@@ -125,7 +116,7 @@ def process_crm_data(
     du_no_pivot_cols = [col for col in pivot_merge.columns if col not in ['CIF_KH_VAY', 'GIÁ TRỊ TS', 'DƯ NỢ'] and '(Giá trị TS)' not in col]
     ts_value_pivot_cols = [col for col in pivot_merge.columns if '(Giá trị TS)' in col and col != 'CIF_KH_VAY']
     cols_order = ['STT', 'CUSTTPCD', 'CIF_KH_VAY', 'TEN_KH_VAY', 'NHOM_NO'] + \
-                sorted(du_no_pivot_cols) + sorted(ts_value_pivot_cols) + ['DƯ NỢ', 'GIÁ TRỊ TS']
+                 sorted(du_no_pivot_cols) + sorted(ts_value_pivot_cols) + ['DƯ NỢ', 'GIÁ TRỊ TS']
     cols_order_existing = [col for col in cols_order if col in pivot_final.columns]
     pivot_final = pivot_final[cols_order_existing]
 
@@ -134,13 +125,12 @@ def process_crm_data(
     ma_cap_c = [f"{i:02d}" for i in range(1, 8)] + [f"{i:02d}" for i in range(28, 32)]
     list_cif_cap_c = df_crm32_filtered[df_crm32_filtered['MA_PHE_DUYET'].isin(ma_cap_c)]['CUSTSEQLN'].unique().astype(str)
     list_co_cau = ['ACOV1', 'ACOV3', 'ATT01', 'ATT02', 'ATT03', 'ATT04',
-                    'BCOV1', 'BCOV2', 'BTT01', 'BTT02', 'BTT03',
-                    'CCOV2', 'CCOV3', 'CTT03', 'RCOV3', 'RTT03']
+                   'BCOV1', 'BCOV2', 'BTT01', 'BTT02', 'BTT03',
+                   'CCOV2', 'CCOV3', 'CTT03', 'RCOV3', 'RTT03']
     cif_co_cau = df_crm32_filtered[df_crm32_filtered['SCHEME_CODE'].isin(list_co_cau)]['CUSTSEQLN'].unique().astype(str)
 
     if df_muc_dich_data is None:
         st.error("File CODE_MDSDV4 chưa được tải hoặc lỗi.")
-        # Trả về None cho tất cả các kết quả để tránh lỗi unpack
         return None, None, None, None, None, None, None, None, None, None, None, None, None
     df_muc_dich_vay_src = df_muc_dich_data[['CODE_MDSDV4', 'GROUP']].copy()
     df_muc_dich_vay_src.columns = ['MUC_DICH_VAY_CAP_4', 'MUC DICH']
@@ -169,7 +159,7 @@ def process_crm_data(
     df_crm4_blank = df_crm4_filtered[~df_crm4_filtered['LOAI'].isin(['Cho vay', 'Bao lanh', 'LC'])].copy()
     df_crm4_blank['CIF_KH_VAY'] = df_crm4_blank['CIF_KH_VAY'].astype(str).str.strip()
 
-    if not df_crm4_blank.empty and cif_lech.size > 0 :
+    if not df_crm4_blank.empty and cif_lech.size > 0:
         du_no_bosung = (
             df_crm4_blank[df_crm4_blank['CIF_KH_VAY'].isin(cif_lech)]
             .groupby('CIF_KH_VAY', as_index=False)['DU_NO_PHAN_BO_QUY_DOI']
@@ -185,7 +175,7 @@ def process_crm_data(
     if '(blank)' in cols and 'DƯ NỢ CRM32' in cols:
         cols.insert(cols.index('DƯ NỢ CRM32'), cols.pop(cols.index('(blank)')))
         pivot_full = pivot_full[cols]
-    pivot_full['LECH'] = pivot_full['DƯ NỢ'] - pivot_full.get('DƯ NỢ CRM32',0)
+    pivot_full['LECH'] = pivot_full['DƯ NỢ'] - pivot_full.get('DƯ NỢ CRM32', 0)
 
     pivot_full['NHOM_NO'] = pivot_full['NHOM_NO'].astype(str)
     pivot_full['Nợ nhóm 2'] = pivot_full['NHOM_NO'].apply(lambda x: 'x' if x.strip() == '2' or x.strip() == '2.0' else '')
@@ -237,7 +227,7 @@ def process_crm_data(
     # TSBĐ quá hạn định giá
     ngay_danh_gia_tsbd = pd.to_datetime("2025-03-31")
     loai_ts_r34 = ['BĐS', 'MMTB', 'PTVT']
-    df_crm4_for_tsbd = df_crm4_filtered.copy() # df_crm4_for_tsbd is defined here
+    df_crm4_for_tsbd = df_crm4_filtered.copy()
     df_crm4_for_tsbd['LOAI_TS'] = df_crm4_for_tsbd['LOAI_TS'].astype(str)
     mask_r34 = df_crm4_for_tsbd['LOAI_TS'].isin(loai_ts_r34)
     df_crm4_for_tsbd['VALUATION_DATE'] = pd.to_datetime(df_crm4_for_tsbd['VALUATION_DATE'], errors='coerce')
@@ -252,81 +242,47 @@ def process_crm_data(
         lambda x: 'x' if x in cif_quahan else ''
     )
 
-   
-    # # Khởi tạo cif_canh_bao_series và cif_canh_bao ở đây để đảm bảo chúng luôn được định nghĩa
-    # cif_canh_bao_series = pd.Series(dtype=str)
-    # cif_canh_bao = np.array([], dtype=str)
+    # Xử lý TSBĐ khác địa bàn
+    cif_canh_bao_series = pd.Series(dtype=str)
+    cif_canh_bao = np.array([], dtype=str)
+    df_bds_matched = pd.DataFrame()  # Khởi tạo df_bds_matched rỗng
+    if df_sol_data is not None and dia_ban_kt_filter:
+        df_sol = df_sol_data.copy()
+        if all(col in df_sol.columns for col in ['C01', 'C02', 'C19']):
+            df_crm4_filtered['SECU_SRL_NUM'] = df_crm4_filtered['SECU_SRL_NUM'].astype(str).str.strip()
+            df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
+            df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
+            df_sol['C19'] = df_sol['C19'].astype(str)
 
-    # if df_sol_data is not None and dia_ban_kt_filter:
-    #     df_sol = df_sol_data.copy()
-    #     df_crm4_filtered['SECU_SRL_NUM'] = df_crm4_filtered['SECU_SRL_NUM'].astype(str).str.strip()
-    #     df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
-    #     df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
-    #     df_sol['C19'] = df_sol['C19'].astype(str) # Đảm bảo cột C19 là string
-        
-    #     ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
-    #     df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
-    #     df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
-    #     df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
-    #     def extract_tinh_thanh(diachi):
-    #         if pd.isna(diachi): return ''
-    #         parts = str(diachi).split(',')
-    #         return parts[-1].strip().lower() if parts else ''
-    #     df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
-    #     df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
-    #         lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
-    #     )
-    #     ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
-    #     cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
-    #     cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique() # Cập nhật cif_canh_bao
-    #     pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
-    #         lambda x: 'x' if x in cif_canh_bao else ''
-    #     )
-    # else:
-    #     pivot_full['KH có TSBĐ khác địa bàn'] = ''
-    #     if df_sol_data is None: st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
-    #     if not dia_ban_kt_filter: st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
-    df_crm4_filtered = df_crm4.dropna(subset=['SECU_SRL_NUM'])
-    ds_secu = df_crm4_filtered['SECU_SRL_NUM'].unique()
+            ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
+            df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
+            df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
+            df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
 
-    df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
+            if not df_bds_matched.empty:
+                def extract_tinh_thanh(diachi):
+                    if pd.isna(diachi): return ''
+                    parts = str(diachi).split(',')
+                    return parts[-1].strip().lower() if parts else ''
+                df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
+                df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
+                    lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
+                )
+                ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
+                cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
+                cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique()
+            else:
+                st.warning("Không có dữ liệu BĐS phù hợp trong Mục 17 (df_sol) hoặc không khớp với CRM4.")
+        else:
+            st.warning("File Mục 17 thiếu cột C01, C02 hoặc C19. Bỏ qua xử lý TSBĐ khác địa bàn.")
+    pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
+        lambda x: 'x' if x in cif_canh_bao else ''
+    )
+    if df_sol_data is None:
+        st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
+    if not dia_ban_kt_filter:
+        st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
 
-    # Nhập địa bàn kiểm toán
-    dia_ban_kt = st.text_input("Nhập tên tỉnh/thành của đơn vị đang kiểm toán (ví dụ: Bạc Liêu)").strip().lower()
-
-    if dia_ban_kt:
-        # Bước 1: Lọc BĐS
-        df_bds = df_17_filtered[df_17_filtered['C02'].str.strip() == 'Bat dong san'].copy()
-
-        # Bước 2: Đối chiếu mã tài sản
-        df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4['SECU_SRL_NUM'])].copy()
-
-        # Bước 3: Tách tỉnh/thành từ địa chỉ
-        def extract_tinh_thanh(diachi):
-            if pd.isna(diachi): return ''
-            parts = diachi.split(',')
-            return parts[-1].strip().lower() if parts else ''
-
-        df_bds_matched['TINH_TP_TSBD'] = df_bds_matched['C19'].apply(extract_tinh_thanh)
-
-        # Bước 4: So sánh với địa bàn kiểm toán
-        df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
-            lambda x: 'x' if x and x != dia_ban_kt else ''
-        )
-        # Bước 5 mới: Gắn cờ trực tiếp từ df_bds_matched
-        df_canh_bao_cif = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']
-
-        if not df_canh_bao_cif.empty:
-       # Lấy các CIF từ CRM4 map theo mã tài sản cảnh báo
-       cif_canh_bao = df_crm4[df_crm4['SECU_SRL_NUM'].isin(df_canh_bao_cif['C01'])]['CIF_KH_VAY'].dropna().unique()
-       else:
-       cif_canh_bao = []  # không có cảnh báo nào
-
-       # Bước 6: Gắn cờ vào pivot_full — luôn tạo cột dù không có CIF cảnh báo
-       pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
-       lambda x: 'x' if x in cif_canh_bao else ''
-       )
-    
     df_gop = pd.DataFrame()
     df_count = pd.DataFrame()
     if df_55_data is not None and df_56_data is not None:
@@ -363,7 +319,7 @@ def process_crm_data(
     if df_delay_data is not None:
         df_delay = df_delay_data.copy()
         if 'CIF_ID' not in df_delay.columns and 'CUSTSEQLN' in df_delay.columns:
-             df_delay.rename(columns={'CUSTSEQLN': 'CIF_ID'}, inplace=True)
+            df_delay.rename(columns={'CUSTSEQLN': 'CIF_ID'}, inplace=True)
         if 'CIF_ID' in df_delay.columns:
             df_delay['CIF_ID'] = df_delay['CIF_ID'].astype(str).str.strip()
             df_delay['NGAY_DEN_HAN_TT'] = pd.to_datetime(df_delay['NGAY_DEN_HAN_TT'], errors='coerce')
@@ -411,7 +367,7 @@ def process_crm_data(
         pivot_full['KH Phát sinh chậm trả 4-9 ngày'] = ''
         st.warning("Không có dữ liệu Mục 57 (chậm trả) để xử lý.")
 
-    # --- Debugging: Kiểm tra df_bds_matched trước khi trả về ---
+    # Debugging: Kiểm tra df_bds_matched
     st.subheader("⚙️ Debug: Thông tin DataFrame TSBĐ khác địa bàn (df_bds_matched_res)")
     if df_bds_matched is not None:
         st.write(f"Shape của df_bds_matched: {df_bds_matched.shape}")
@@ -421,16 +377,12 @@ def process_crm_data(
             st.info("⚠️ **df_bds_matched rỗng** sau khi xử lý. Các sheet liên quan sẽ không được tạo.")
     else:
         st.warning("❌ **df_bds_matched là None**. Có lỗi xảy ra hoặc file Mục 17 chưa được tải.")
-    # --- Kết thúc Debugging ---
 
-    # Trả về tất cả các DataFrame cần thiết cho việc xuất file
-    # Thêm cif_canh_bao_series và cif_canh_bao vào tuple trả về
     return (pivot_full, df_crm4_filtered, pivot_final, pivot_merge,
             df_crm32_filtered, pivot_mucdich, df_delay_processed, df_gop, df_count,
             df_bds_matched, df_crm4_for_tsbd, cif_canh_bao_series, cif_canh_bao)
 
-
-# --- Giao diện Streamlit ---
+# Giao diện Streamlit
 st.title("Ứng dụng xử lý dữ liệu CRM và tạo báo cáo")
 
 with st.sidebar:
@@ -448,7 +400,6 @@ with st.sidebar:
     st.header("Thông số tùy chọn")
     chi_nhanh_input = st.text_input("Nhập tên chi nhánh hoặc mã SOL (ví dụ: HANOI hoặc 001):", key="chi_nhanh_val").strip().upper()
     dia_ban_kt_input = st.text_input("Nhập tỉnh/thành kiểm toán (ví dụ: Bạc Liêu):", key="dia_ban_val").strip().lower()
-
 
 if st.button("🚀 Bắt đầu xử lý dữ liệu", key="process_button"):
     required_files_present = all([
@@ -485,8 +436,7 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu", key="process_button"):
                         chi_nhanh_input, dia_ban_kt_input
                     )
 
-                    if results and all(r is not None for r in results): # Kiểm tra tất cả các kết quả trả về không phải là None
-                        # Unpack 13 results (thay vì 11 trước đó)
+                    if results and all(r is not None for r in results):
                         (pivot_full_res, df_crm4_filtered_res, pivot_final_res, pivot_merge_res,
                          df_crm32_filtered_res, pivot_mucdich_res, df_delay_res, df_gop_res,
                          df_count_res, df_bds_matched_res, df_crm4_for_tsbd_res,
@@ -508,38 +458,28 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu", key="process_button"):
                             if df_crm32_filtered_res is not None and not df_crm32_filtered_res.empty: df_crm32_filtered_res.to_excel(writer, sheet_name='df_crm32_MUC_DICH', index=False)
                             if pivot_full_res is not None and not pivot_full_res.empty: pivot_full_res.to_excel(writer, sheet_name='KQ_KH', index=False)
                             if pivot_mucdich_res is not None and not pivot_mucdich_res.empty: pivot_mucdich_res.to_excel(writer, sheet_name='Pivot_crm32', index=False)
-                            if df_delay_res is not None and not df_delay_res.empty : df_delay_res.to_excel(writer, sheet_name='tieu chi 4 (cham tra)', index=False)
+                            if df_delay_res is not None and not df_delay_res.empty: df_delay_res.to_excel(writer, sheet_name='tieu chi 4 (cham tra)', index=False)
                             if df_gop_res is not None and not df_gop_res.empty: df_gop_res.to_excel(writer, sheet_name='tieu chi 3 (gop GN TT)', index=False)
                             if df_count_res is not None and not df_count_res.empty: df_count_res.to_excel(writer, sheet_name='tieu chi 3 (dem GN TT)', index=False)
-
-                            # df_bds_matched_res: TSBĐ khác địa bàn
                             if df_bds_matched_res is not None and not df_bds_matched_res.empty:
                                 df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
                                 df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2_dot3', index=False)
                             else:
                                 st.info("⚠️ Không có dữ liệu TSBĐ khác địa bàn để xuất ra sheet 'tieu chi 2 (BDS khac DB)' và 'tieu chi 2_dot3'.")
-
-                            # df_crm4_for_tsbd_res: TSBĐ quá hạn định giá
                             if df_crm4_for_tsbd_res is not None and not df_crm4_for_tsbd_res.empty:
                                 df_crm4_for_tsbd_res.to_excel(writer, sheet_name='tieu chi 1)', index=False)
                             else:
                                 st.info("⚠️ Không có dữ liệu TSBĐ quá hạn định giá để xuất ra sheet 'tieu chi 1)'.")
-
-                            # --- Bổ sung xuất cif_canh_bao_series và cif_canh_bao ---
                             if cif_canh_bao_series_res is not None and not cif_canh_bao_series_res.empty:
                                 cif_canh_bao_series_res.to_excel(writer, sheet_name='CIF_CanhBao_Series', index=False)
                             else:
                                 st.info("⚠️ Không có dữ liệu CIF_CanhBao_Series để xuất ra sheet.")
-
                             if cif_canh_bao_res is not None and len(cif_canh_bao_res) > 0:
-                                # Chuyển numpy array thành DataFrame để xuất
                                 pd.DataFrame(cif_canh_bao_res, columns=['CIF_KH_VAY']).to_excel(writer, sheet_name='CIF_CanhBao_Unique', index=False)
                             else:
                                 st.info("⚠️ Không có dữ liệu CIF_CanhBao_Unique để xuất ra sheet.")
-                            # --- Kết thúc bổ sung ---
 
                         excel_data = output.getvalue()
-
                         if excel_data:
                             st.download_button(
                                 label="📥 Tải xuống file Excel kết quả (KQ_XuLy.xlsx)",
