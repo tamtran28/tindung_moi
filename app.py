@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 import os
+import uuid
 
 # Thiết lập trang rộng hơn
 st.set_page_config(layout="wide")
@@ -195,7 +196,7 @@ def process_crm_data(
     pivot_full = pivot_full.merge(df_baolanh_sum, on='CIF_KH_VAY', how='left')
     pivot_full = pivot_full.merge(df_lc_sum, on='CIF_KH_VAY', how='left')
     pivot_full['DƯ_NỢ_BẢO_LÃNH'] = pivot_full['DƯ_NỢ_BẢO_LÃNH'].fillna(0)
-    pivot_full['DƯ_NỢ_LC'] = pivot_full['DƯ_NỢ_LC'].fillna(0)
+    pivot_full['DƯ_NỢ_LC'] = pivot_full['DƯ_NỌ_LC'].fillna(0)
 
     if df_giai_ngan_data is not None:
         df_giai_ngan = df_giai_ngan_data.copy()
@@ -242,13 +243,14 @@ def process_crm_data(
         lambda x: 'x' if x in cif_quahan else ''
     )
 
-    # Xử lý TSBĐ khác địa bàn (đã xóa st.warning)
+    # Xử lý TSBĐ khác địa bàn (từ code Colab)
     cif_canh_bao_series = pd.Series(dtype=str)
     cif_canh_bao = np.array([], dtype=str)
     df_bds_matched = pd.DataFrame()  # Khởi tạo df_bds_matched rỗng
     if df_sol_data is not None and dia_ban_kt_filter:
         df_sol = df_sol_data.copy()
         if all(col in df_sol.columns for col in ['C01', 'C02', 'C19']):
+            # Chuẩn hóa dữ liệu
             df_crm4_filtered['SECU_SRL_NUM'] = df_crm4_filtered['SECU_SRL_NUM'].astype(str).str.strip()
             df_sol['C01'] = df_sol['C01'].astype(str).str.strip()
             df_sol['C02'] = df_sol['C02'].astype(str).str.strip()
@@ -256,8 +258,13 @@ def process_crm_data(
 
             ds_secu = df_crm4_filtered['SECU_SRL_NUM'].dropna().unique()
             df_17_filtered = df_sol[df_sol['C01'].isin(ds_secu)]
-            df_bds = df_17_filtered[df_17_filtered['C02'] == 'Bat dong san'].copy()
+            df_bds = df_17_filtered[df_17_filtered['C02'].str.strip() == 'Bat dong san'].copy()
             df_bds_matched = df_bds[df_bds['C01'].isin(df_crm4_filtered['SECU_SRL_NUM'])].copy()
+
+            # Debug thông tin
+            st.write("Debug: Số dòng df_17_filtered (sau lọc C01 khớp SECU_SRL_NUM):", len(df_17_filtered))
+            st.write("Debug: Số dòng df_bds (sau lọc C02 = 'Bat dong san'):", len(df_bds))
+            st.write("Debug: Số dòng df_bds_matched:", len(df_bds_matched))
 
             if not df_bds_matched.empty:
                 def extract_tinh_thanh(diachi):
@@ -268,9 +275,13 @@ def process_crm_data(
                 df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] = df_bds_matched['TINH_TP_TSBD'].apply(
                     lambda x: 'x' if x and x != dia_ban_kt_filter.strip().lower() else ''
                 )
+                st.write("Debug: Các tỉnh/thành trong TSBĐ:", df_bds_matched['TINH_TP_TSBD'].unique())
+                st.write("Debug: Địa bàn kiểm toán:", dia_ban_kt_filter)
                 ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
                 cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
                 cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique()
+                st.write("Debug: Số mã tài sản cảnh báo (ma_ts_canh_bao):", len(ma_ts_canh_bao))
+                st.write("Debug: Số CIF cảnh báo (cif_canh_bao):", len(cif_canh_bao))
     pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
         lambda x: 'x' if x in cif_canh_bao else ''
     )
@@ -355,19 +366,20 @@ def process_crm_data(
             pivot_full['KH Phát sinh chậm trả > 10 ngày'] = ''
             pivot_full['KH Phát sinh chậm trả 4-9 ngày'] = ''
     else:
-        pivot_full['KH có cả GNG và TT trong 1 ngày'] = ''
+        pivot_full['KH Phát sinh chậm trả > 10 ngày'] = ''
+        pivot_full['KH Phát sinh chậm trả 4-9 ngày'] = ''
         st.warning("Không có dữ liệu Mục 57 (chậm trả) để xử lý.")
 
     # Debugging: Kiểm tra df_bds_matched
-    st.subheader("⚙️ Debug: Thông tin DataFrame TSBĐ khác địa bàn (df_bds_matched_res)")
+    st.subheader("⚙️ Debug: Thông tin DataFrame TSBĐ khác địa bàn (df_bds_matched)")
     if df_bds_matched is not None:
         st.write(f"Shape của df_bds_matched: {df_bds_matched.shape}")
         if not df_bds_matched.empty:
             st.dataframe(df_bds_matched.head())
         else:
-            st.info("⚠️ **df_bds_matched rỗng** sau khi xử lý. Các sheet liên quan sẽ không được tạo.")
+            st.info("⚠️ df_bds_matched rỗng sau khi xử lý. Các sheet liên quan sẽ không được tạo.")
     else:
-        st.warning("❌ **df_bds_matched là None**. Có lỗi xảy ra hoặc file Mục 17 chưa được tải.")
+        st.warning("❌ df_bds_matched là None. Có lỗi xảy ra hoặc file Mục 17 chưa được tải.")
 
     return (pivot_full, df_crm4_filtered, pivot_final, pivot_merge,
             df_crm32_filtered, pivot_mucdich, df_delay_processed, df_gop, df_count,
@@ -379,11 +391,11 @@ st.title("Ứng dụng xử lý dữ liệu CRM và tạo báo cáo")
 with st.sidebar:
     st.header("Tải lên các file Excel")
     uploaded_crm4_files = st.file_uploader("1. Các file CRM4 (Du_no_theo_tai_san_dam_bao_ALL)", type=["xls", "xlsx"], accept_multiple_files=True, key="crm4")
-    uploaded_crm32_files = st.file_uploader("2. Các file CRM32 (RPT_CRM_32)", type=["xls", "xlsx", "xlsb"], accept_multiple_files=True, key="crm32")
+    uploaded_crm32_files = st.file_uploader("2. Các file CRM32 (RPT_CRM_32)", type=["xls", "xlsx"], accept_multiple_files=True, key="crm32")
     uploaded_muc_dich_file = st.file_uploader("3. File CODE_MDSDV4.xlsx", type="xlsx", key="m_dich")
     uploaded_code_tsbd_file = st.file_uploader("4. File CODE_LOAI TSBD.xlsx", type="xlsx", key="tsbd")
     uploaded_sol_file = st.file_uploader("5. File MUC 17.xlsx (Dữ liệu SOL)", type="xlsx", key="sol")
-    uploaded_giai_ngan_file = st.file_uploader("6. File Giai_ngan_tien_mat_1_ty (hoặc tương tự)", type=["xls","xlsx"], key="giai_ngan")
+    uploaded_giai_ngan_file = st.file_uploader("6. File Giai_ngan_tien_mat_1_ty (hoặc tương tự)", type=["xls", "xlsx"], key="giai_ngan")
     uploaded_55_file = st.file_uploader("7. File Muc55 (Tất toán).xlsx", type="xlsx", key="muc55")
     uploaded_56_file = st.file_uploader("8. File Muc56 (Giải ngân).xlsx", type="xlsx", key="muc56")
     uploaded_delay_file = st.file_uploader("9. File Muc57 (Chậm trả).xlsx", type="xlsx", key="delay")
@@ -443,15 +455,24 @@ if st.button("🚀 Bắt đầu xử lý dữ liệu", key="process_button"):
 
                         output = BytesIO()
                         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            if df_crm4_filtered_res is not None and not df_crm4_filtered_res.empty: df_crm4_filtered_res.to_excel(writer, sheet_name='df_crm4_LOAI_TS', index=False)
-                            if pivot_final_res is not None and not pivot_final_res.empty: pivot_final_res.to_excel(writer, sheet_name='KQ_CRM4', index=False)
-                            if pivot_merge_res is not None and not pivot_merge_res.empty: pivot_merge_res.to_excel(writer, sheet_name='Pivot_crm4', index=False)
-                            if df_crm32_filtered_res is not None and not df_crm32_filtered_res.empty: df_crm32_filtered_res.to_excel(writer, sheet_name='df_crm32_MUC_DICH', index=False)
-                            if pivot_full_res is not None and not pivot_full_res.empty: pivot_full_res.to_excel(writer, sheet_name='KQ_KH', index=False)
-                            if pivot_mucdich_res is not None and not pivot_mucdich_res.empty: pivot_mucdich_res.to_excel(writer, sheet_name='Pivot_crm32', index=False)
-                            if df_delay_res is not None and not df_delay_res.empty: df_delay_res.to_excel(writer, sheet_name='tieu chi 4 (cham tra)', index=False)
-                            if df_gop_res is not None and not df_gop_res.empty: df_gop_res.to_excel(writer, sheet_name='tieu chi 3 (gop GN TT)', index=False)
-                            if df_count_res is not None and not df_count_res.empty: df_count_res.to_excel(writer, sheet_name='tieu chi 3 (dem GN TT)', index=False)
+                            if df_crm4_filtered_res is not None and not df_crm4_filtered_res.empty:
+                                df_crm4_filtered_res.to_excel(writer, sheet_name='df_crm4_LOAI_TS', index=False)
+                            if pivot_final_res is not None and not pivot_final_res.empty:
+                                pivot_final_res.to_excel(writer, sheet_name='KQ_CRM4', index=False)
+                            if pivot_merge_res is not None and not pivot_merge_res.empty:
+                                pivot_merge_res.to_excel(writer, sheet_name='Pivot_crm4', index=False)
+                            if df_crm32_filtered_res is not None and not df_crm32_filtered_res.empty:
+                                df_crm32_filtered_res.to_excel(writer, sheet_name='df_crm32_MUC_DICH', index=False)
+                            if pivot_full_res is not None and not pivot_full_res.empty:
+                                pivot_full_res.to_excel(writer, sheet_name='KQ_KH', index=False)
+                            if pivot_mucdich_res is not None and not pivot_mucdich_res.empty:
+                                pivot_mucdich_res.to_excel(writer, sheet_name='Pivot_crm32', index=False)
+                            if df_delay_res is not None and not df_delay_res.empty:
+                                df_delay_res.to_excel(writer, sheet_name='tieu chi 4 (cham tra)', index=False)
+                            if df_gop_res is not None and not df_gop_res.empty:
+                                df_gop_res.to_excel(writer, sheet_name='tieu chi 3 (gop GN TT)', index=False)
+                            if df_count_res is not None and not df_count_res.empty:
+                                df_count_res.to_excel(writer, sheet_name='tieu chi 3 (dem GN TT)', index=False)
                             if df_bds_matched_res is not None and not df_bds_matched_res.empty:
                                 df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2 (BDS khac DB)', index=False)
                                 df_bds_matched_res.to_excel(writer, sheet_name='tieu chi 2_dot3', index=False)
