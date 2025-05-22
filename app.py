@@ -242,7 +242,7 @@ def process_crm_data(
         lambda x: 'x' if x in cif_quahan else ''
     )
 
-    # Xử lý TSBĐ khác địa bàn
+    # Xử lý TSBĐ khác địa bàn (đã xóa st.warning)
     cif_canh_bao_series = pd.Series(dtype=str)
     cif_canh_bao = np.array([], dtype=str)
     df_bds_matched = pd.DataFrame()  # Khởi tạo df_bds_matched rỗng
@@ -271,17 +271,9 @@ def process_crm_data(
                 ma_ts_canh_bao = df_bds_matched[df_bds_matched['CANH_BAO_TS_KHAC_DIABAN'] == 'x']['C01'].unique()
                 cif_canh_bao_series = df_crm4_filtered[df_crm4_filtered['SECU_SRL_NUM'].isin(ma_ts_canh_bao)]['CIF_KH_VAY']
                 cif_canh_bao = cif_canh_bao_series.astype(str).str.strip().dropna().unique()
-            else:
-                st.warning("Không có dữ liệu BĐS phù hợp trong Mục 17 (df_sol) hoặc không khớp với CRM4.")
-        else:
-            st.warning("File Mục 17 thiếu cột C01, C02 hoặc C19. Bỏ qua xử lý TSBĐ khác địa bàn.")
     pivot_full['KH có TSBĐ khác địa bàn'] = pivot_full['CIF_KH_VAY'].apply(
         lambda x: 'x' if x in cif_canh_bao else ''
     )
-    if df_sol_data is None:
-        st.warning("Không có dữ liệu Mục 17 (df_sol) để xử lý TSBĐ khác địa bàn.")
-    if not dia_ban_kt_filter:
-        st.warning("Chưa nhập địa bàn kiểm toán để xử lý TSBĐ khác địa bàn.")
 
     df_gop = pd.DataFrame()
     df_count = pd.DataFrame()
@@ -363,8 +355,7 @@ def process_crm_data(
             pivot_full['KH Phát sinh chậm trả > 10 ngày'] = ''
             pivot_full['KH Phát sinh chậm trả 4-9 ngày'] = ''
     else:
-        pivot_full['KH Phát sinh chậm trả > 10 ngày'] = ''
-        pivot_full['KH Phát sinh chậm trả 4-9 ngày'] = ''
+        pivot_full['KH có cả GNG và TT trong 1 ngày'] = ''
         st.warning("Không có dữ liệu Mục 57 (chậm trả) để xử lý.")
 
     # Debugging: Kiểm tra df_bds_matched
@@ -388,7 +379,7 @@ st.title("Ứng dụng xử lý dữ liệu CRM và tạo báo cáo")
 with st.sidebar:
     st.header("Tải lên các file Excel")
     uploaded_crm4_files = st.file_uploader("1. Các file CRM4 (Du_no_theo_tai_san_dam_bao_ALL)", type=["xls", "xlsx"], accept_multiple_files=True, key="crm4")
-    uploaded_crm32_files = st.file_uploader("2. Các file CRM32 (RPT_CRM_32)", type=["xls", "xlsx"], accept_multiple_files=True, key="crm32")
+    uploaded_crm32_files = st.file_uploader("2. Các file CRM32 (RPT_CRM_32)", type=["xls", "xlsx", "xlsb"], accept_multiple_files=True, key="crm32")
     uploaded_muc_dich_file = st.file_uploader("3. File CODE_MDSDV4.xlsx", type="xlsx", key="m_dich")
     uploaded_code_tsbd_file = st.file_uploader("4. File CODE_LOAI TSBD.xlsx", type="xlsx", key="tsbd")
     uploaded_sol_file = st.file_uploader("5. File MUC 17.xlsx (Dữ liệu SOL)", type="xlsx", key="sol")
