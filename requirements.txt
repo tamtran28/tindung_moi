@@ -2,5 +2,6 @@ streamlit
 pandas
 numpy
 openpyxl
-xlrd  # <--- Thêm dòng này
-# ... các thư viện khác nếu có
+xlrd
+xlsxwriter
+python-dateutil
